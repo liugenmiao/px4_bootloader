@@ -167,6 +167,7 @@ inline void cinit(void *config, uint8_t interface)
 
 #endif
 }
+
 inline void cfini(void)
 {
 #if INTERFACE_USB
@@ -175,36 +176,6 @@ inline void cfini(void)
 #if INTERFACE_USART
 	uart_cfini();
 #endif
-}
-inline int cin(uint32_t devices)
-{
-#if INTERFACE_USB
-
-	if ((bl_type == NONE || bl_type == USB) && (devices & USB0_DEV) != 0) {
-		int usb_in = usb_cin();
-
-		if (usb_in >= 0) {
-			last_input = USB;
-			return usb_in;
-		}
-	}
-
-#endif
-
-#if INTERFACE_USART
-
-	if ((bl_type == NONE || bl_type == USART) && (devices & SERIAL0_DEV) != 0) {
-		int	uart_in = uart_cin();
-
-		if (uart_in >= 0) {
-			last_input = USART;
-			return uart_in;
-		}
-	}
-
-#endif
-
-	return -1;
 }
 
 inline void cout(uint8_t *buf, unsigned len)
@@ -224,6 +195,42 @@ inline void cout(uint8_t *buf, unsigned len)
 
 #endif
 }
+
+static void
+cout_word(uint32_t val)
+{
+        cout((uint8_t *)&val, 4);
+}
+
+inline int cin(uint32_t devices)
+{
+#if INTERFACE_USB
+
+        if ((bl_type == NONE || bl_type == USB) && (devices & USB0_DEV) != 0) { 
+                int usb_in = usb_cin();
+
+                if (usb_in >= 0) { 
+                        last_input = USB; 
+                        return usb_in;
+                }
+        }
+
+#endif
+
+#if INTERFACE_USART
+
+        if ((bl_type == NONE || bl_type == USART) && (devices & SERIAL0_DEV) != 0) { 
+                int   uart_in = uart_cin();
+                if (uart_in >= 0) { 
+                        last_input = USART;
+                        return uart_in;
+                }
+        }
+
+#endif
+        return -1;
+}
+
 
 /* The PX4IO is so low on FLASH that this abstaction is not possible as
  * a called API. Therefore these macros are needed.
@@ -255,9 +262,42 @@ static const uint32_t	bl_proto_rev = BL_PROTOCOL_VERSION;	// value returned by P
 static unsigned head, tail;
 static uint8_t rx_buf[256] USB_DATA_ALIGN;
 
+static unsigned uart_head, uart_tail;
+static uint8_t uart_rx_buf[256] ;
+
 static enum led_state {LED_BLINK, LED_ON, LED_OFF} _led_state;
 
 void sys_tick_handler(void);
+
+#if  defined(TARGET_HW_PX4_FMU_V3)   
+#define heq_printf heq_printf
+#else
+#define heq_printf heq_printf 
+#endif
+
+void
+uart_buf_put(uint8_t b)
+{
+	unsigned next = (uart_head + 1) % sizeof(uart_rx_buf);
+
+	if (next != uart_tail) {
+		uart_rx_buf[uart_head] = b;
+		uart_head = next;
+	}
+}
+
+int
+uart_buf_get(void)
+{
+	int	ret = -1;
+
+	if (uart_tail != uart_head) {
+		ret = uart_rx_buf[uart_tail];
+		uart_tail = (uart_tail + 1) % sizeof(uart_rx_buf);
+	}
+
+	return ret;
+}
 
 void
 buf_put(uint8_t b)
@@ -448,14 +488,11 @@ cin_wait(unsigned timeout)
 
 	do {
 		c = cin(board_get_devices());
-
 		if (c >= 0) {
 			cin_count++;
 			break;
 		}
-
 	} while (timer[TIMER_CIN] > 0);
-
 	return c;
 }
 
@@ -469,12 +506,6 @@ inline static bool
 wait_for_eoc(unsigned timeout)
 {
 	return cin_wait(timeout) == PROTO_EOC;
-}
-
-static void
-cout_word(uint32_t val)
-{
-	cout((uint8_t *)&val, 4);
 }
 
 static int
@@ -537,6 +568,7 @@ bootloader(unsigned timeout)
 	volatile uint32_t  bl_state = 0; // Must see correct command sequence to erase and reboot (commit first word)
 	uint32_t	address = board_info.fw_size;	/* force erase before upload will work */
 	uint32_t	first_word = 0xffffffff;
+	//int flag = 0;
 
 	/* (re)start the timer system */
 	arch_systic_init();
@@ -565,7 +597,6 @@ bootloader(unsigned timeout)
 			if (timeout && !timer[TIMER_BL_WAIT]) {
 				return;
 			}
-
 			/* try to get a byte from the host */
 			c = cin_wait(0);
 
@@ -589,6 +620,7 @@ bootloader(unsigned timeout)
 			}
 
 			bl_state = STATE_PROTO_GET_SYNC;
+			heq_printf("PROTO_GET_SYNC\r\n");
 			break;
 
 		// get device info
@@ -602,6 +634,7 @@ bootloader(unsigned timeout)
 		// bad arg reply:	INSYNC/INVALID
 		//
 		case PROTO_GET_DEVICE:
+			//flag = 1;
 			/* expect arg then EOC */
 			arg = cin_wait(1000);
 
@@ -642,6 +675,7 @@ bootloader(unsigned timeout)
 			default:
 				goto cmd_bad;
 			}
+			heq_printf("PROTO_GET_DEVICE\r\n");
 
 			SET_BL_STATE(STATE_PROTO_GET_DEVICE);
 			break;
@@ -696,6 +730,7 @@ bootloader(unsigned timeout)
 
 			// resume blinking
 			led_set(LED_BLINK);
+			heq_printf("PROTO_CHIP_ERASE\r\n");
 			break;
 
 		// program bytes at current address
@@ -771,6 +806,7 @@ bootloader(unsigned timeout)
 				address += 4;
 			}
 
+			heq_printf("PROTO_PROG_MULTI\r\n");
 			SET_BL_STATE(STATE_PROTO_PROG_MULTI);
 
 			break;
@@ -804,6 +840,7 @@ bootloader(unsigned timeout)
 			}
 
 			cout_word(sum);
+			heq_printf("PROTO_GET_CRC\r\n");
 			SET_BL_STATE(STATE_PROTO_GET_CRC);
 			break;
 
@@ -825,6 +862,7 @@ bootloader(unsigned timeout)
 					goto cmd_bad;
 				}
 
+				heq_printf("PROTO_GET_OTP\r\n");
 				cout_word(flash_func_read_otp(index));
 			}
 			break;
@@ -970,6 +1008,7 @@ bootloader(unsigned timeout)
 			sync_response();
 			delay(100);
 
+			heq_printf("reboot\r\n");
 			// quiesce and jump to the app
 			return;
 

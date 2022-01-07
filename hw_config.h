@@ -195,6 +195,18 @@
 # define BOARD_LED_ON                   gpio_clear
 # define BOARD_LED_OFF                  gpio_set
 
+# define BOARD_USART_DEBUG                          UART7
+# define BOARD_USART_DEBUG_CLOCK_REGISTER           RCC_APB1ENR
+# define BOARD_USART_DEBUG_CLOCK_BIT                RCC_APB1ENR_UART7EN
+//# define BOARD_USART_DEBUG_CLOCK_BIT                RCC_APB1LPENR_UART7EN
+
+# define BOARD_PORT_USART_DEBUG                     GPIOE
+# define BOARD_PORT_USART_DEBUG_AF                  GPIO_AF8
+# define BOARD_PIN_TX_DEBUG                         GPIO8
+# define BOARD_PIN_RX_DEBUG                         GPIO7
+# define BOARD_USART_DEBUG_PIN_CLOCK_REGISTER       RCC_AHB1ENR
+# define BOARD_USART_DEBUG_PIN_CLOCK_BIT            RCC_AHB1ENR_IOPEEN
+
 # define BOARD_USART                    USART2
 # define BOARD_USART_CLOCK_REGISTER     RCC_APB1ENR
 # define BOARD_USART_CLOCK_BIT          RCC_APB1ENR_USART2EN
@@ -1116,7 +1128,7 @@
 #if defined(OVERRIDE_USART_BAUDRATE)
 #  define USART_BAUDRATE OVERRIDE_USART_BAUDRATE
 #else
-#  define USART_BAUDRATE 115200
+#  define USART_BAUDRATE 57600
 #endif
 
 #if INTERFACE_USART

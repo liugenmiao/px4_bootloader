@@ -43,8 +43,11 @@ export FLAGS		 = -std=gnu99 \
 			   -Wl,-gc-sections \
 			   -Wl,-g \
 			   -Werror
+#			   --specs=nosys.specs\
+#			   -funwind-tables
 
 export COMMON_SRCS	 = bl.c
+#export ARCH_SRCS	 = cdcacm.c  usart.c print.c
 export ARCH_SRCS	 = cdcacm.c  usart.c
 
 #

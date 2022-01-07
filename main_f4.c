@@ -385,15 +385,37 @@ board_init(void)
 	rcc_peripheral_enable_clock(&BOARD_USART_PIN_CLOCK_REGISTER, BOARD_USART_PIN_CLOCK_BIT_TX);
 	rcc_peripheral_enable_clock(&BOARD_USART_PIN_CLOCK_REGISTER, BOARD_USART_PIN_CLOCK_BIT_RX);
 
+
 	/* Setup GPIO pins for USART transmit. */
 	gpio_mode_setup(BOARD_PORT_USART_TX, GPIO_MODE_AF, GPIO_PUPD_PULLUP, BOARD_PIN_TX);
 	gpio_mode_setup(BOARD_PORT_USART_RX, GPIO_MODE_AF, GPIO_PUPD_PULLUP, BOARD_PIN_RX);
+	
+	
 	/* Setup USART TX & RX pins as alternate function. */
 	gpio_set_af(BOARD_PORT_USART_TX, BOARD_PORT_USART_AF_TX, BOARD_PIN_TX);
 	gpio_set_af(BOARD_PORT_USART_RX, BOARD_PORT_USART_AF_RX, BOARD_PIN_RX);
+	
 
 	/* configure USART clock */
 	rcc_peripheral_enable_clock(&BOARD_USART_CLOCK_REGISTER, BOARD_USART_CLOCK_BIT);
+	
+	//add by peter, add debug usart
+	#if  defined(TARGET_HW_PX4_FMU_V3)
+	/* configure USART pins */
+	rcc_peripheral_enable_clock(&BOARD_USART_DEBUG_PIN_CLOCK_REGISTER, BOARD_USART_DEBUG_PIN_CLOCK_BIT);
+	rcc_peripheral_enable_clock(&BOARD_USART_DEBUG_PIN_CLOCK_REGISTER, BOARD_USART_DEBUG_PIN_CLOCK_BIT);
+	
+	/* Setup GPIO pins for USART transmit. */
+	gpio_mode_setup(BOARD_PORT_USART_DEBUG, GPIO_MODE_AF, GPIO_PUPD_PULLUP, BOARD_PIN_TX_DEBUG);
+	gpio_mode_setup(BOARD_PORT_USART_DEBUG, GPIO_MODE_AF, GPIO_PUPD_PULLUP, BOARD_PIN_RX_DEBUG);
+	
+	/* Setup USART TX & RX pins as alternate function. */
+	gpio_set_af(BOARD_PORT_USART_DEBUG, BOARD_PORT_USART_DEBUG_AF, BOARD_PIN_TX_DEBUG);
+	gpio_set_af(BOARD_PORT_USART_DEBUG, BOARD_PORT_USART_DEBUG_AF, BOARD_PIN_RX_DEBUG);
+	
+	/* configure USART clock */
+	rcc_peripheral_enable_clock(&BOARD_USART_DEBUG_CLOCK_REGISTER, BOARD_USART_DEBUG_CLOCK_BIT);
+	#endif
 #endif
 
 #if defined(BOARD_FORCE_BL_PIN_IN) && defined(BOARD_FORCE_BL_PIN_OUT)
@@ -441,6 +463,13 @@ board_deinit(void)
 
 	/* disable USART peripheral clock */
 	rcc_peripheral_disable_clock(&BOARD_USART_CLOCK_REGISTER, BOARD_USART_CLOCK_BIT);
+	
+//add by peter, add debug usart
+#if  defined(TARGET_HW_PX4_FMU_V3)	
+	gpio_mode_setup(BOARD_PORT_USART_DEBUG, GPIO_MODE_INPUT, GPIO_PUPD_NONE, BOARD_PIN_TX_DEBUG);
+	gpio_mode_setup(BOARD_PORT_USART_DEBUG, GPIO_MODE_INPUT, GPIO_PUPD_NONE, BOARD_PIN_RX_DEBUG);
+	rcc_peripheral_disable_clock(&BOARD_USART_DEBUG_CLOCK_REGISTER, BOARD_USART_DEBUG_CLOCK_BIT);
+#endif
 #endif
 
 #if defined(BOARD_FORCE_BL_PIN_IN) && defined(BOARD_FORCE_BL_PIN_OUT)
@@ -891,6 +920,10 @@ main(void)
 	/* start the interface */
 #if INTERFACE_USART
 	cinit(BOARD_INTERFACE_CONFIG_USART, USART);
+#if  defined(TARGET_HW_PX4_FMU_V3)
+	//cinit((void *)BOARD_USART_DEBUG, USART);
+#endif
+
 #endif
 #if INTERFACE_USB
 	cinit(BOARD_INTERFACE_CONFIG_USB, USB);

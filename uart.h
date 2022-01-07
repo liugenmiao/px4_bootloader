@@ -43,3 +43,6 @@ extern void uart_cinit(void *config);
 extern void uart_cfini(void);
 extern int uart_cin(void);
 extern void uart_cout(uint8_t *buf, unsigned len);
+
+extern void uart_debug_cinit(void *config);
+extern int heq_printf(const char *fmt);
